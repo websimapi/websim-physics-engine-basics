@@ -4,12 +4,10 @@ import { PhysicsWorld, PhysicsBody } from './physics3d.js';
 
 class Scene3D {
   constructor() {
-    // Initialize properties
     this.meshes = [];
     this.bodies = [];
     this.physics = new PhysicsWorld();
     
-    // Ensure DOM is loaded before initialization
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.init());
     } else {
@@ -18,7 +16,6 @@ class Scene3D {
   }
 
   init() {
-    // Three.js setup
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
       75,
@@ -32,22 +29,13 @@ class Scene3D {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     
-    const container = document.getElementById('container');
-    container.appendChild(this.renderer.domElement);
+    document.getElementById('container').appendChild(this.renderer.domElement);
 
-    // Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-
-    // Lighting
     this.setupLights();
-
-    // Ground
     this.createGround();
-
-    // Event listeners
     this.setupEventListeners();
 
-    // Animation loop
     this.lastTime = 0;
     this.animate();
   }
@@ -130,6 +118,9 @@ class Scene3D {
         size = { radius: cylRadius, height };
         geometry = new THREE.CylinderGeometry(cylRadius, cylRadius, height, 32);
         break;
+      default:
+        size = { x: 1, y: 1, z: 1 };
+        geometry = new THREE.BoxGeometry(1, 1, 1);
     }
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -154,10 +145,8 @@ class Scene3D {
     const deltaTime = (time - this.lastTime) / 1000;
     this.lastTime = time;
 
-    // Update physics
     this.physics.update(deltaTime);
 
-    // Update mesh positions
     for (let i = 0; i < this.bodies.length; i++) {
       const position = this.bodies[i].body.position;
       const quaternion = this.bodies[i].body.quaternion;
@@ -171,5 +160,6 @@ class Scene3D {
   }
 }
 
-// Start the scene
-new Scene3D();
+!function() {
+  new Scene3D();
+}();

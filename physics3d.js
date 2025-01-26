@@ -34,6 +34,8 @@ export class PhysicsBody {
           16
         );
         break;
+      default:
+        shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
     }
 
     const body = new CANNON.Body({
@@ -47,7 +49,6 @@ export class PhysicsBody {
       material: material
     });
 
-    // Add some initial random rotation
     body.angularVelocity.set(
       Math.random() - 0.5,
       Math.random() - 0.5,
@@ -70,7 +71,7 @@ export class PhysicsBody {
       x: (Math.random() - 0.5) * magnitude,
       y: (Math.random() - 0.5) * magnitude,
       z: (Math.random() - 0.5) * magnitude
-    );
+    });
     
     this.body.angularVelocity.set(
       (Math.random() - 0.5) * 10,
@@ -82,14 +83,12 @@ export class PhysicsBody {
 
 export class PhysicsWorld {
   constructor() {
-    this.world = new CANNON.World({
-      gravity: new CANNON.Vec3(0, -9.82, 0)
-    });
+    this.world = new CANNON.World();
+    this.world.gravity.set(0, -9.82, 0);
     
     this.world.defaultContactMaterial.friction = 0.3;
     this.world.defaultContactMaterial.restitution = 0.7;
     
-    // Create ground
     this.createGround();
   }
 
