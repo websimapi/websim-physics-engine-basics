@@ -119,3 +119,127 @@ export class PhysicsWorld {
     this.world.addBody(body);
   }
 }
+export class RagdollCharacter {
+  constructor(world, position) {
+    this.world = world;
+    this.bodies = [];
+    this.constraints = [];
+    this.moveForce = 50;
+    this.jumpForce = 250;
+    this.isGrounded = false;
+    this.createRagdoll(position);
+  }
+
+  createRagdoll(position) {
+    // Create torso
+    const torsoShape = new CANNON.Box(new CANNON.Vec3(0.3, 0.5, 0.2));
+    this.torso = new CANNON.Body({
+      mass: 5,
+      position: new CANNON.Vec3(position.x, position.y + 2, position.z),
+      shape: torsoShape,
+    });
+    
+    // Create head (sphere)
+    const headShape = new CANNON.Sphere(0.25);
+    this.head = new CANNON.Body({
+      mass: 1,
+      position: new CANNON.Vec3(position.x, position.y + 3, position.z),
+      shape: headShape,
+    });
+
+    // Create legs
+    this.leftLeg = this.createLimb(position, -0.2, 0.3, 0.15, 0.5);
+    this.rightLeg = this.createLimb(position, 0.2, 0.3, 0.15, 0.5);
+
+    // Create arms
+    this.leftArm = this.createLimb(position, -0.4, 0.15, 0.15, 0.4);
+    this.rightArm = this.createLimb(position, 0.4, 0.15, 0.15, 0.4);
+
+    // Add all bodies to the world
+    this.bodies = [this.torso, this.head, this.leftLeg, this.rightLeg, this.leftArm, this.rightArm];
+    this.bodies.forEach(body => this.world.addBody(body));
+
+    // Connect head to torso
+    this.createConstraint(this.torso, this.head, {
+      pivotA: new CANNON.Vec3(0, 0.5, 0),
+      pivotB: new CANNON.Vec3(0, -0.25, 0),
+      maxForce: 50
+    });
+
+    // Connect limbs to torso
+    this.createConstraint(this.torso, this.leftLeg, {
+      pivotA: new CANNON.Vec3(-0.2, -0.5, 0),
+      pivotB: new CANNON.Vec3(0, 0.25, 0),
+      maxForce: 100
+    });
+    this.createConstraint(this.torso, this.rightLeg, {
+      pivotA: new CANNON.Vec3(0.2, -0.5, 0),
+      pivotB: new CANNON.Vec3(0, 0.25, 0),
+      maxForce: 100
+    });
+    this.createConstraint(this.torso, this.leftArm, {
+      pivotA: new CANNON.Vec3(-0.3, 0.3, 0),
+      pivotB: new CANNON.Vec3(0, 0.2, 0),
+      maxForce: 50
+    });
+    this.createConstraint(this.torso, this.rightArm, {
+      pivotA: new CANNON.Vec3(0.3, 0.3, 0),
+      pivotB: new CANNON.Vec3(0, 0.2, 0),
+      maxForce: 50
+    });
+
+    // Add contact detection
+    this.bodies.forEach(body => {
+      body.addEventListener('collide', () => {
+        this.isGrounded = true;
+      });
+    });
+  }
+
+  createLimb(position, offsetX, width, depth, height) {
+    const shape = new CANNON.Box(new CANNON.Vec3(width, height, depth));
+    return new CANNON.Body({
+      mass: 1,
+      position: new CANNON.Vec3(
+        position.x + offsetX,
+        position.y + height,
+        position.z
+      ),
+      shape: shape
+    });
+  }
+
+  createConstraint(bodyA, bodyB, options) {
+    const constraint = new CANNON.PointToPointConstraint(
+      bodyA, options.pivotA,
+      bodyB, options.pivotB,
+      options.maxForce
+    );
+    this.world.addConstraint(constraint);
+    this.constraints.push(constraint);
+  }
+
+  move(direction) {
+    const force = new CANNON.Vec3(
+      direction.x * this.moveForce,
+      0,
+      direction.z * this.moveForce
+    );
+    this.torso.applyForce(force, this.torso.position);
+  }
+
+  jump() {
+    if (this.isGrounded) {
+      const force = new CANNON.Vec3(0, this.jumpForce, 0);
+      this.torso.applyForce(force, this.torso.position);
+      this.isGrounded = false;
+    }
+  }
+
+  getPositions() {
+    return this.bodies.map(body => ({
+      position: body.position,
+      quaternion: body.quaternion
+    }));
+  }
+}
