@@ -119,6 +119,7 @@ export class PhysicsWorld {
     this.world.addBody(body);
   }
 }
+
 export class RagdollCharacter {
   constructor(world, position) {
     this.world = world;
@@ -127,19 +128,22 @@ export class RagdollCharacter {
     this.moveForce = 50;
     this.jumpForce = 250;
     this.isGrounded = false;
+    this.balanceForce = 20; 
+    this.waddleFrequency = 2; 
+    this.waddleAmount = 0.3; 
+    this.waddleTime = 0;
     this.createRagdoll(position);
   }
 
   createRagdoll(position) {
-    // Create torso
     const torsoShape = new CANNON.Box(new CANNON.Vec3(0.3, 0.5, 0.2));
     this.torso = new CANNON.Body({
       mass: 5,
       position: new CANNON.Vec3(position.x, position.y + 2, position.z),
       shape: torsoShape,
+      material: new CANNON.Material({ friction: 0.5 })
     });
     
-    // Create head (sphere)
     const headShape = new CANNON.Sphere(0.25);
     this.head = new CANNON.Body({
       mass: 1,
@@ -147,36 +151,66 @@ export class RagdollCharacter {
       shape: headShape,
     });
 
-    // Create legs
-    this.leftLeg = this.createLimb(position, -0.2, 0.3, 0.15, 0.5);
-    this.rightLeg = this.createLimb(position, 0.2, 0.3, 0.15, 0.5);
+    const footMaterial = new CANNON.Material({ friction: 1.0 });
+    this.leftFoot = new CANNON.Body({
+      mass: 0.5,
+      position: new CANNON.Vec3(position.x - 0.2, position.y, position.z),
+      shape: new CANNON.Box(new CANNON.Vec3(0.1, 0.1, 0.15)),
+      material: footMaterial
+    });
+    this.rightFoot = new CANNON.Body({
+      mass: 0.5,
+      position: new CANNON.Vec3(position.x + 0.2, position.y, position.z),
+      shape: new CANNON.Box(new CANNON.Vec3(0.1, 0.1, 0.15)),
+      material: footMaterial
+    });
 
-    // Create arms
+    this.leftLeg = this.createLimb(position, -0.2, 0.1, 0.1, 0.4, 0.8);
+    this.rightLeg = this.createLimb(position, 0.2, 0.1, 0.1, 0.4, 0.8);
+    
     this.leftArm = this.createLimb(position, -0.4, 0.15, 0.15, 0.4);
     this.rightArm = this.createLimb(position, 0.4, 0.15, 0.15, 0.4);
 
-    // Add all bodies to the world
-    this.bodies = [this.torso, this.head, this.leftLeg, this.rightLeg, this.leftArm, this.rightArm];
+    this.bodies = [
+      this.torso, 
+      this.head, 
+      this.leftLeg, 
+      this.rightLeg, 
+      this.leftArm, 
+      this.rightArm,
+      this.leftFoot,
+      this.rightFoot
+    ];
     this.bodies.forEach(body => this.world.addBody(body));
 
-    // Connect head to torso
     this.createConstraint(this.torso, this.head, {
       pivotA: new CANNON.Vec3(0, 0.5, 0),
       pivotB: new CANNON.Vec3(0, -0.25, 0),
       maxForce: 50
     });
 
-    // Connect limbs to torso
+    this.createConstraint(this.leftLeg, this.leftFoot, {
+      pivotA: new CANNON.Vec3(0, -0.4, 0),
+      pivotB: new CANNON.Vec3(0, 0.1, 0),
+      maxForce: 150
+    });
+    this.createConstraint(this.rightLeg, this.rightFoot, {
+      pivotA: new CANNON.Vec3(0, -0.4, 0),
+      pivotB: new CANNON.Vec3(0, 0.1, 0),
+      maxForce: 150
+    });
+
     this.createConstraint(this.torso, this.leftLeg, {
       pivotA: new CANNON.Vec3(-0.2, -0.5, 0),
-      pivotB: new CANNON.Vec3(0, 0.25, 0),
-      maxForce: 100
+      pivotB: new CANNON.Vec3(0, 0.4, 0),
+      maxForce: 120
     });
     this.createConstraint(this.torso, this.rightLeg, {
       pivotA: new CANNON.Vec3(0.2, -0.5, 0),
-      pivotB: new CANNON.Vec3(0, 0.25, 0),
-      maxForce: 100
+      pivotB: new CANNON.Vec3(0, 0.4, 0),
+      maxForce: 120
     });
+
     this.createConstraint(this.torso, this.leftArm, {
       pivotA: new CANNON.Vec3(-0.3, 0.3, 0),
       pivotB: new CANNON.Vec3(0, 0.2, 0),
@@ -188,18 +222,18 @@ export class RagdollCharacter {
       maxForce: 50
     });
 
-    // Add contact detection
-    this.bodies.forEach(body => {
-      body.addEventListener('collide', () => {
-        this.isGrounded = true;
-      });
+    this.leftFoot.addEventListener('collide', () => {
+      this.isGrounded = true;
+    });
+    this.rightFoot.addEventListener('collide', () => {
+      this.isGrounded = true;
     });
   }
 
-  createLimb(position, offsetX, width, depth, height) {
+  createLimb(position, offsetX, width, depth, height, mass = 1) {
     const shape = new CANNON.Box(new CANNON.Vec3(width, height, depth));
     return new CANNON.Body({
-      mass: 1,
+      mass: mass,
       position: new CANNON.Vec3(
         position.x + offsetX,
         position.y + height,
@@ -220,12 +254,29 @@ export class RagdollCharacter {
   }
 
   move(direction) {
+    this.waddleTime += 0.1;
+    const waddleOffset = Math.sin(this.waddleTime * this.waddleFrequency) * this.waddleAmount;
+
     const force = new CANNON.Vec3(
       direction.x * this.moveForce,
       0,
       direction.z * this.moveForce
     );
     this.torso.applyForce(force, this.torso.position);
+
+    const currentRotation = new CANNON.Quaternion();
+    this.torso.quaternion.copy(currentRotation);
+    const upVector = new CANNON.Vec3(0, 1, 0);
+    const currentUp = new CANNON.Vec3();
+    currentRotation.vmult(upVector, currentUp);
+    const torqueX = -currentUp.z * this.balanceForce;
+    const torqueZ = currentUp.x * this.balanceForce;
+    this.torso.torque.set(torqueX, 0, torqueZ);
+
+    const leftWaddleForce = new CANNON.Vec3(0, waddleOffset * 2, 0);
+    const rightWaddleForce = new CANNON.Vec3(0, -waddleOffset * 2, 0);
+    this.leftFoot.applyForce(leftWaddleForce, this.leftFoot.position);
+    this.rightFoot.applyForce(rightWaddleForce, this.rightFoot.position);
   }
 
   jump() {
