@@ -96,27 +96,38 @@ class Scene3D {
   }
 
   createRagdollMeshes() {
+    // Clear existing meshes
+    this.ragdollMeshes.forEach(mesh => {
+      if (mesh && mesh.parent) {
+        this.scene.remove(mesh);
+      }
+    });
+    this.ragdollMeshes = [];
+
     const materials = {
       torso: new THREE.MeshStandardMaterial({ color: 0xff6b6b }),
       head: new THREE.MeshStandardMaterial({ color: 0xffd93d }),
-      limb: new THREE.MeshStandardMaterial({ color: 0x4d96ff })
+      limb: new THREE.MeshStandardMaterial({ color: 0x4d96ff }),
+      foot: new THREE.MeshStandardMaterial({ color: 0x4d96ff })
     };
 
-    const torsoGeom = new THREE.BoxGeometry(0.6, 1, 0.4);
-    const torsoMesh = new THREE.Mesh(torsoGeom, materials.torso);
-    
-    const headGeom = new THREE.SphereGeometry(0.25, 16, 16);
-    const headMesh = new THREE.Mesh(headGeom, materials.head);
-    
-    const limbGeom = new THREE.BoxGeometry(0.3, 0.8, 0.3);
-    const limbs = Array(4).fill(null).map(() => 
-      new THREE.Mesh(limbGeom, materials.limb)
-    );
+    // Create all the body parts
+    const meshConfigs = [
+      { geom: new THREE.BoxGeometry(0.6, 1, 0.4), mat: materials.torso }, // torso
+      { geom: new THREE.SphereGeometry(0.25, 16, 16), mat: materials.head }, // head
+      { geom: new THREE.BoxGeometry(0.2, 0.8, 0.2), mat: materials.limb }, // left leg
+      { geom: new THREE.BoxGeometry(0.2, 0.8, 0.2), mat: materials.limb }, // right leg
+      { geom: new THREE.BoxGeometry(0.2, 0.8, 0.2), mat: materials.limb }, // left arm
+      { geom: new THREE.BoxGeometry(0.2, 0.8, 0.2), mat: materials.limb }, // right arm
+      { geom: new THREE.BoxGeometry(0.2, 0.2, 0.3), mat: materials.foot }, // left foot
+      { geom: new THREE.BoxGeometry(0.2, 0.2, 0.3), mat: materials.foot }  // right foot
+    ];
 
-    this.ragdollMeshes = [torsoMesh, headMesh, ...limbs];
-    this.ragdollMeshes.forEach(mesh => {
+    meshConfigs.forEach(config => {
+      const mesh = new THREE.Mesh(config.geom, config.mat);
       mesh.castShadow = true;
       this.scene.add(mesh);
+      this.ragdollMeshes.push(mesh);
     });
   }
 
@@ -196,25 +207,32 @@ class Scene3D {
     this.handleInput(deltaTime);
     this.physics.update(deltaTime);
 
+    // Update physics objects
     for (let i = 0; i < this.bodies.length; i++) {
-      const position = this.bodies[i].body.position;
-      const quaternion = this.bodies[i].body.quaternion;
-      
-      this.meshes[i].position.copy(position);
-      this.meshes[i].quaternion.copy(quaternion);
+      if (this.bodies[i] && this.meshes[i]) {
+        const position = this.bodies[i].body.position;
+        const quaternion = this.bodies[i].body.quaternion;
+        
+        this.meshes[i].position.copy(position);
+        this.meshes[i].quaternion.copy(quaternion);
+      }
     }
 
+    // Update ragdoll meshes
     const bodyPositions = this.character.getPositions();
-    bodyPositions.forEach((data, index) => {
-      this.ragdollMeshes[index].position.copy(data.position);
-      this.ragdollMeshes[index].quaternion.copy(data.quaternion);
-    });
+    if (bodyPositions && bodyPositions.length === this.ragdollMeshes.length) {
+      bodyPositions.forEach((data, index) => {
+        if (this.ragdollMeshes[index]) {
+          this.ragdollMeshes[index].position.copy(data.position);
+          this.ragdollMeshes[index].quaternion.copy(data.quaternion);
+        }
+      });
+    }
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 }
 
-!function() {
-  new Scene3D();
-}();
+// Initialize the scene
+new Scene3D();
