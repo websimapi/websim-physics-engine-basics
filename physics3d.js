@@ -70,7 +70,7 @@ export class PhysicsBody {
       x: (Math.random() - 0.5) * magnitude,
       y: (Math.random() - 0.5) * magnitude,
       z: (Math.random() - 0.5) * magnitude
-    });
+    );
     
     this.body.angularVelocity.set(
       (Math.random() - 0.5) * 10,
